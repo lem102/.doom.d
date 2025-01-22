@@ -49,3 +49,4 @@
 ;; (unpin! t)
 
 (package! xah-fly-keys)
+(package! expand-region)

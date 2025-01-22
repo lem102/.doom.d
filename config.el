@@ -36,7 +36,7 @@
 
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
-(setq display-line-numbers-type t)
+(setq display-line-numbers-type nil)
 
 ;; If you use `org' and don't want your org files in the default location below,
 ;; change `org-directory'. It must be set before org loads!
@@ -75,6 +75,13 @@
 ;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
 ;; they are implemented.
 
+(setq-default truncate-lines nil)
+(setopt word-wrap nil)
+
+(auto-save-visited-mode 1)
+
+(global-subword-mode 1)
+
 (setopt xah-fly-use-control-key nil
         xah-fly-use-meta-key nil)
 
@@ -100,7 +107,7 @@
 (keymap-global-set "M-SPC" #'xah-fly-command-mode-activate)
 
 (keymap-set xah-fly-command-map "4" #'other-window-prefix)
-(keymap-set xah-fly-command-map "9" #'jacob-swap-visible-buffers)
+;; (keymap-set xah-fly-command-map "9" #'jacob-swap-visible-buffers)
 (keymap-set xah-fly-command-map ";" #'lemovem-end-of-line)
 (keymap-set xah-fly-command-map "d" #'lemovem-backspace)
 (keymap-set xah-fly-command-map "g" #'lemovem-kill-paragraph)
@@ -136,3 +143,19 @@
     (jacob-xfk-local-key "c" #'dired-do-copy)
     (jacob-xfk-local-key "u" #'dired-up-directory)
     (jacob-xfk-local-key "j" #'dired-goto-file)))
+
+(after! helpful
+  (jacob-defhookf helpful-mode-hook
+    (jacob-xfk-local-key "q" #'+popup/quit-window)))
+
+(after! magit
+  (jacob-defhookf magit-mode-hook
+    (jacob-xfk-local-key "q" #'+magit/quit)))
+
+(after! corfu
+  (map! :map corfu-map
+        "M-SPC" nil))
+
+(require 'expand-region)
+(keymap-set xah-fly-command-map "8" #'er/expand-region)
+(setopt expand-region-contract-fast-key "9")
