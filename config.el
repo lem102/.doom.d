@@ -183,7 +183,8 @@
   "Get the id property from the stored verb response pertaining to RESPONSE-ID."
   (verb-json-get (oref (verb-stored-response response-id) body) "id"))
 
-(setopt org-agenda-skip-scheduled-if-done t
+(setopt org-agenda-start-day nil
+        org-agenda-skip-scheduled-if-done t
         org-agenda-skip-deadline-if-done t
         org-agenda-custom-commands '(("a" "Morning" agenda "" ((org-agenda-tag-filter-preset '("+tickler" "+am"))
                                                                (org-agenda-span 'day)))
@@ -192,11 +193,10 @@
                                      ("w" "Work" todo "" ((org-agenda-tag-filter-preset '("+work"))))
                                      ("x" "Stuff to do today"
                                       agenda ""
-                                      ((org-agenda-span 3)
-                                       (org-agenda-start-day "-1d")
-                                       (org-agenda-time-grid '((daily today require-timed)
+                                      ((org-agenda-time-grid '((daily today require-timed)
                                                                nil
                                                                " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
+                                       (org-agenda-span 'day)
                                        (org-agenda-tag-filter-preset '("-tickler" "-work"))))))
 
 ;;; Keybindings
