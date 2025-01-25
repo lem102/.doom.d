@@ -75,12 +75,11 @@
 ;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
 ;; they are implemented.
 
-(setq-default truncate-lines nil)
-(setopt word-wrap nil)
+;;; Environment
 
-(auto-save-visited-mode 1)
+(load! "environment.el")
 
-(global-subword-mode 1)
+;;; xah fly keys
 
 (setopt xah-fly-use-control-key nil
         xah-fly-use-meta-key nil)
@@ -89,15 +88,127 @@
 (xah-fly-keys-set-layout "qwerty")
 (xah-fly-keys 1)
 
-(defun jacob-xfk-local-key (key command)
-  "Bind KEY buffer locally to COMMAND in xfk command mode."
-  (let ((existing-command (keymap-lookup xah-fly-command-map key nil "NO-REMAP")))
-    (unless existing-command
-      (user-error "%s is not bound to a key in `xah-fly-command-map'" key))
-    (keymap-local-set (format "<remap> <%s>" existing-command)
-                      command)))
+;;; Editor
+
+(auto-save-visited-mode 1)
+
+(global-subword-mode 1)
 
 (load! "lemovem.el")
+
+(require 'expand-region)
+(setopt expand-region-contract-fast-key "9")
+
+;;; UI
+
+(after! lsp-mode
+  (setopt lsp-ui-doc-enable nil
+          lsp-lens-enable nil
+          lsp-ui-sideline-enable nil
+          lsp-eldoc-enable-hover t
+          lsp-eldoc-render-all t))
+
+(after! eldoc
+  (setopt eldoc-documentation-strategy 'eldoc-documentation-compose))
+
+(setq-default truncate-lines nil)
+(setopt word-wrap nil)
+
+(defun jacob-lsp-signature-eldoc (eldoc-callback &rest _ignored)
+  "Send `lsp-signature-mode' stuff to `eldoc'."
+  (when lsp-mode
+    (let ((f (lambda (signature)
+               (let ((message
+                      (if (lsp-signature-help? signature)
+                          (lsp--signature->message signature)
+                        (mapconcat #'lsp--signature->message signature "\n"))))
+                 (when (s-present? message)
+                   (funcall eldoc-callback message))))))
+      (lsp-request-async "textDocument/signatureHelp"
+                         (lsp--text-document-position-params)
+                         f
+                         :cancel-token :signature))))
+
+;; adapted from https://www.masteringemacs.org/article/seamlessly-merge-multiple-documentation-sources-eldoc
+(defun jacob-flycheck-eldoc (callback &rest _ignored)
+  "Print flycheck messages at point by calling CALLBACK."
+  (when-let ((flycheck-errors (and flycheck-mode (flycheck-overlay-errors-at (point)))))
+    (mapc
+     (lambda (err)
+       (funcall callback
+                (flycheck-error-message err)
+                :thing (or (flycheck-error-id err)
+                           (flycheck-error-group err))
+                :face 'font-lock-doc-face))
+     flycheck-errors)))
+
+(defun jacob-prefer-eldoc ()
+  (add-hook 'eldoc-documentation-functions #'jacob-flycheck-eldoc nil "LOCAL")
+  (add-hook 'eldoc-documentation-functions #'jacob-lsp-signature-eldoc nil "LOCAL")
+  (setq eldoc-documentation-strategy 'eldoc-documentation-compose-eagerly)
+  (setq flycheck-display-errors-function nil)
+  (setq flycheck-help-echo-function nil))
+
+(after! (lsp-mode eldoc)
+  (add-hook! 'lsp-mode-hook #'jacob-prefer-eldoc))
+
+(after! compile
+  (setopt compilation-scroll-output t))
+
+;;; Completion
+
+(setopt completion-ignore-case t)
+
+(setq-default tab-always-indent 'complete)
+
+(after! csharp-mode
+  ;; Change from `c-indent-line' to this to allow TAB to double for completion.
+  (keymap-set csharp-mode-map "TAB" #'indent-for-tab-command))
+
+(after! corfu
+  (map! :map corfu-map
+        "M-SPC" nil)
+  (setopt corfu-auto nil))
+
+(after! dabbrev
+  (setopt dabbrev-case-fold-search nil
+          dabbrev-case-replace nil))
+
+;;; tools
+
+(require 'verb)
+(add-hook 'org-mode-hook 'verb-mode)
+
+(defun jacob-verb-id (response-id)
+  "Get the id property from the stored verb response pertaining to RESPONSE-ID."
+  (verb-json-get (oref (verb-stored-response response-id) body) "id"))
+
+(setopt org-agenda-skip-scheduled-if-done t
+        org-agenda-skip-deadline-if-done t
+        org-agenda-custom-commands '(("a" "Morning" agenda "" ((org-agenda-tag-filter-preset '("+tickler" "+am"))
+                                                               (org-agenda-span 'day)))
+                                     ("p" "Evening" agenda "" ((org-agenda-tag-filter-preset '("+tickler" "+pm"))
+                                                               (org-agenda-span 'day)))
+                                     ("w" "Work" todo "" ((org-agenda-tag-filter-preset '("+work"))))
+                                     ("x" "Stuff to do today"
+                                      agenda ""
+                                      ((org-agenda-span 3)
+                                       (org-agenda-start-day "-1d")
+                                       (org-agenda-time-grid '((daily today require-timed)
+                                                               nil
+                                                               " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
+                                       (org-agenda-tag-filter-preset '("-tickler" "-work"))))))
+
+;;; Keybindings
+
+;; setting `doom-leader-key' somehow allows which-key to know the names of the
+;; keymaps that are “underneath” `doom-leader-map'.
+
+;; (setq doom-leader-key nil)
+;; (setq doom-localleader-key  nil)
+;; (setq doom-leader-alt-key "SPC SPC")
+;; (setq doom-localleader-alt-key "SPC SPC m")
+(keymap-set xah-fly-command-map "SPC SPC" doom-leader-map)
 
 (defalias 'jacob-return-macro
   (kmacro "<return>"))
@@ -117,6 +228,16 @@
 
 (keymap-set xah-fly-insert-map "M-SPC" #'xah-fly-command-mode-activate)
 
+(keymap-set xah-fly-command-map "8" #'er/expand-region)
+
+(defun jacob-xfk-local-key (key command)
+  "Bind KEY buffer locally to COMMAND in xfk command mode."
+  (let ((existing-command (keymap-lookup xah-fly-command-map key nil "NO-REMAP")))
+    (unless existing-command
+      (user-error "%s is not bound to a key in `xah-fly-command-map'" key))
+    (keymap-local-set (format "<remap> <%s>" existing-command)
+                      command)))
+
 (defmacro jacob-defhookf (hook &rest body)
   "Define function with BODY and bind it to HOOK."
   (declare (indent defun))
@@ -133,7 +254,7 @@
     (dired-hide-details-mode 1)
     (jacob-xfk-local-key "s" #'dired-find-file)
     (jacob-xfk-local-key "d" #'dired-do-delete) ; we skip the "flag, delete" process as files are sent to system bin on deletion
-    (jacob-xfk-local-key "q" #'quit-window)
+    (jacob-xfk-local-key "q" #'dirvish-quit)
     (jacob-xfk-local-key "i" #'dired-previous-line)
     (jacob-xfk-local-key "k" #'dired-next-line)
     (jacob-xfk-local-key "e" #'dired-mark)
@@ -152,10 +273,17 @@
   (jacob-defhookf magit-mode-hook
     (jacob-xfk-local-key "q" #'+magit/quit)))
 
-(after! corfu
-  (map! :map corfu-map
-        "M-SPC" nil))
+(jacob-defhookf verb-response-body-mode-hook
+  (jacob-xfk-local-key "q" #'quit-window))
 
-(require 'expand-region)
-(keymap-set xah-fly-command-map "8" #'er/expand-region)
-(setopt expand-region-contract-fast-key "9")
+(after! compile
+  (jacob-defhookf compilation-mode-hook
+    (jacob-xfk-local-key "g" #'recompile)))
+
+(jacob-defhookf +doom-dashboard-mode-hook
+  (jacob-xfk-local-key "k" #'+doom-dashboard/forward-button)
+  (jacob-xfk-local-key "i" #'+doom-dashboard/backward-button))
+
+(jacob-defhookf org-agenda-mode-hook
+  (jacob-xfk-local-key "q" #'quit-window)
+  (jacob-xfk-local-key "g" #'org-agenda-redo-all))

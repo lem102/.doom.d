@@ -48,5 +48,9 @@
 ;; ...Or *all* packages (NOT RECOMMENDED; will likely break things)
 ;; (unpin! t)
 
+(package! flycheck-popup-tip :disable t)
+(package! flymake-popon :disable t)
+
 (package! xah-fly-keys)
 (package! expand-region)
+(package! verb)

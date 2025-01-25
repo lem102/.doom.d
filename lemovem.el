@@ -61,7 +61,7 @@ prefix argument is provided, just delete the pair characters."
     (let ((content-end (save-excursion
                          (when (comment-search-forward (line-end-position) "NOERROR")
                            (goto-char (match-beginning 0))
-                           (skip-syntax-backward " " (line-beginning-position))
+                           (skip-syntax-backward " <" (line-beginning-position))
                            (unless (= (point) (line-beginning-position))
                              (point))))))
       (if (or (null content-end)
