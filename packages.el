@@ -54,3 +54,4 @@
 (package! xah-fly-keys)
 (package! expand-region)
 (package! verb)
+(package! feature-mode)

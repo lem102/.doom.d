@@ -77,7 +77,7 @@
 
 ;;; Environment
 
-(load! "environment.el")
+(load! "environment.el" nil "NOERROR")
 
 ;;; xah fly keys
 
