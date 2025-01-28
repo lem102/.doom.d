@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# key: class
+# --
+public ${1:class} ${2:X}($3)
+{
+    $0
+}

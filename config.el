@@ -75,6 +75,17 @@
 ;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
 ;; they are implemented.
 
+(defmacro jacob-defhookf (hook &rest body)
+  "Define function with BODY and bind it to HOOK."
+  (declare (indent defun))
+  (let* ((hook-name (symbol-name hook))
+         (function-name (intern (concat "jacob-" hook-name "-function"))))
+    `(progn
+       (defun ,function-name ()
+         ,(format "Auto-generated hook function for `%s'." hook-name)
+         ,@body)
+       (add-hook ',hook #',function-name))))
+
 ;;; Environment
 
 (load! "environment.el" nil "NOERROR")
@@ -155,6 +166,15 @@
 (after! compile
   (setopt compilation-scroll-output t))
 
+(defun jacob-reset-cursor-advice ()
+  "Advice for `wdired-exit'."
+  (setq cursor-type t))
+
+(after! (dired dirvish)
+  ;; fix not restoring cursor to solid box
+  (advice-add #'wdired-exit :after #'jacob-reset-cursor-advice)
+  (advice-add #'wdired-finish-edit :after #'jacob-reset-cursor-advice))
+
 ;;; Completion
 
 (setopt completion-ignore-case t)
@@ -163,7 +183,7 @@
 
 (after! csharp-mode
   ;; Change from `c-indent-line' to this to allow TAB to double for completion.
-  (keymap-set csharp-mode-map "TAB" #'indent-for-tab-command))
+  (keymap-set csharp-mode-map "TAB" #'completion-at-point))
 
 (after! corfu
   (map! :map corfu-map
@@ -174,6 +194,47 @@
   (setopt dabbrev-case-fold-search nil
           dabbrev-case-replace nil))
 
+(after! yasnippet
+  (defun jacob-yas-camel-case (input)
+    "Convert INPUT to camel case e.g. apple banana -> appleBanana.
+For use in yasnippets."
+    (let* ((space-at-end (if (string-match-p " $" input) " " ""))
+           (words (split-string input))
+           (capitalised-words (seq-reduce (lambda (previous current)
+                                            (concat previous (capitalize current)))
+                                          (cdr words)
+                                          (car words))))
+      (concat capitalised-words space-at-end)))
+
+  (defun jacob-yas-pascal-case (input)
+    "Convert INPUT to pascal case e.g. apple banana -> AppleBanana.
+For use in yasnippets."
+    (let ((space-at-end (if (string-match-p " $" input)
+                            " "
+                          "")))
+      (with-temp-buffer
+        (insert input)
+        (goto-char (point-min))
+        (subword-mode 1)
+        (while (not (= (point) (point-max)))
+          (call-interactively #'capitalize-word))
+        (goto-char (point-min))
+        (while (search-forward " " nil "NOERROR")
+          (replace-match ""))
+        (goto-char (point-max))
+        (insert space-at-end)
+        (buffer-substring-no-properties (point-min) (point-max)))))
+
+  (defun jacob-yas-snake-case (input)
+    "Convert INPUT to snake case e.g. apple banana -> apple_banana.
+For use in yasnippets."
+    (string-replace " " "_" input))
+
+  (defun jacob-yas-kebab-case (input)
+    "Convert INPUT to kebab case e.g. apple banana -> apple_banana.
+For use in yasnippets."
+    (string-replace " " "-" input)))
+
 ;;; tools
 
 (require 'verb)
@@ -182,6 +243,8 @@
 (defun jacob-verb-id (response-id)
   "Get the id property from the stored verb response pertaining to RESPONSE-ID."
   (verb-json-get (oref (verb-stored-response response-id) body) "id"))
+
+(add-to-list 'org-capture-templates '("i" "Inbox" entry (file "") "* TODO %?\n:PROPERTIES:\n:CREATED: %U\n:END:"))
 
 (setopt org-agenda-start-day nil
         org-agenda-skip-scheduled-if-done t
@@ -199,16 +262,68 @@
                                        (org-agenda-span 'day)
                                        (org-agenda-tag-filter-preset '("-tickler" "-work"))))))
 
+(after! dap-mode
+  (require 'dap-netcore)
+
+  (dap-register-debug-template ".Net Core Launch (ASP.Net)"
+                               (list :type "coreclr"
+                                     :request "launch"
+                                     :mode "launch"
+                                     :name "NetCoreDbg::Launch"
+                                     :dap-compilation "dotnet build"
+                                     ;; TODO work out how can I populate the environemnt values from launchSettings.json
+                                     :env '(("ASPNETCORE_ENVIRONMENT" . "Development"))
+                                     :cwd "/home/jacobl/dev/tappitGitHub/loyalty-discount-service/Presentation/Discount.Api/")))
+
+(after! prodigy
+  (setopt prodigy-kill-process-buffer-on-stop t)
+
+  (prodigy-define-tag
+    :name 'asp.net
+    :stop-signal 'kill
+    :on-output (lambda (&rest args)
+                 (let ((output (plist-get args :output))
+                       (service (plist-get args :service)))
+                   (when (string-match-p "Hosting started *$" output)
+                     (prodigy-set-status service 'ready))))))
+
+(after! sql
+  (defun jacob-sql-connect ()
+    "Wrapper for `sql-connect' to set postgres password.
+CONNECTION is the connection settings."
+    (interactive)
+    (let ((connection (sql-read-connection "Connection: ")))
+      (with-environment-variables
+          (("PGPASSWORD" (cadr (assoc 'sql-password
+                                      (assoc-string connection
+                                                    sql-connection-alist
+                                                    t)))))
+        (sql-connect connection)))))
+
+(jacob-defhookf sql-interactive-mode-hook
+                (when (eq sql-product 'postgres)
+                  (setq sql-prompt-regexp "^[-[:alnum:]_]*[-=]\\*?[#>] ")
+                  (setq sql-prompt-cont-regexp "^\\(?:\\sw\\|\\s_\\)*[-(]\\*?[#>] "))
+                (jacob-xfk-local-key "SPC , d" #'sql-send-paragraph))
+
+(defun jacob-sqli-end-of-buffer ()
+  "Move point to end of sqli buffer before sending paragraph.
+
+Intended as before advice for `sql-send-paragraph'."
+  (with-current-buffer sql-buffer
+    (goto-char (point-max))))
+
+(advice-add #'sql-send-paragraph :before #'jacob-sqli-end-of-buffer)
+
 ;;; Keybindings
 
 ;; setting `doom-leader-key' somehow allows which-key to know the names of the
 ;; keymaps that are “underneath” `doom-leader-map'.
 
-;; (setq doom-leader-key nil)
-;; (setq doom-localleader-key  nil)
-;; (setq doom-leader-alt-key "SPC SPC")
-;; (setq doom-localleader-alt-key "SPC SPC m")
-(keymap-set xah-fly-command-map "SPC SPC" doom-leader-map)
+;; (setq doom-leader-key "SPC SPC")
+;; (setq doom-localleader-key "SPC SPC m")
+
+;; (keymap-set xah-fly-command-map "SPC SPC" doom-leader-map)
 
 (defalias 'jacob-return-macro
   (kmacro "<return>"))
@@ -238,52 +353,60 @@
     (keymap-local-set (format "<remap> <%s>" existing-command)
                       command)))
 
-(defmacro jacob-defhookf (hook &rest body)
-  "Define function with BODY and bind it to HOOK."
-  (declare (indent defun))
-  (let* ((hook-name (symbol-name hook))
-         (function-name (intern (concat "jacob-" hook-name "-function"))))
-    `(progn
-       (defun ,function-name ()
-         ,(format "Auto-generated hook function for `%s'." hook-name)
-         ,@body)
-       (add-hook ',hook #',function-name))))
-
 (after! dired
   (jacob-defhookf dired-mode-hook
-    (dired-hide-details-mode 1)
-    (jacob-xfk-local-key "s" #'dired-find-file)
-    (jacob-xfk-local-key "d" #'dired-do-delete) ; we skip the "flag, delete" process as files are sent to system bin on deletion
-    (jacob-xfk-local-key "q" #'dirvish-quit)
-    (jacob-xfk-local-key "i" #'dired-previous-line)
-    (jacob-xfk-local-key "k" #'dired-next-line)
-    (jacob-xfk-local-key "e" #'dired-mark)
-    (jacob-xfk-local-key "r" #'dired-unmark)
-    (jacob-xfk-local-key "g" #'revert-buffer)
-    (jacob-xfk-local-key "x" #'dired-do-rename)
-    (jacob-xfk-local-key "c" #'dired-do-copy)
-    (jacob-xfk-local-key "u" #'dired-up-directory)
-    (jacob-xfk-local-key "j" #'dired-goto-file)))
+                  (dired-hide-details-mode 1)
+                  (jacob-xfk-local-key "s" #'dired-find-file)
+                  (jacob-xfk-local-key "d" #'dired-do-delete) ; we skip the "flag, delete" process as files are sent to system bin on deletion
+                  (jacob-xfk-local-key "q" #'dirvish-quit)
+                  (jacob-xfk-local-key "i" #'dired-previous-line)
+                  (jacob-xfk-local-key "k" #'dired-next-line)
+                  (jacob-xfk-local-key "e" #'dired-mark)
+                  (jacob-xfk-local-key "r" #'dired-unmark)
+                  (jacob-xfk-local-key "g" #'revert-buffer)
+                  (jacob-xfk-local-key "x" #'dired-do-rename)
+                  (jacob-xfk-local-key "c" #'dired-do-copy)
+                  (jacob-xfk-local-key "u" #'dired-up-directory)
+                  (jacob-xfk-local-key "j" #'dired-goto-file)))
 
 (after! helpful
   (jacob-defhookf helpful-mode-hook
-    (jacob-xfk-local-key "q" #'+popup/quit-window)))
+                  (jacob-xfk-local-key "q" #'+popup/quit-window)))
 
 (after! magit
   (jacob-defhookf magit-mode-hook
-    (jacob-xfk-local-key "q" #'+magit/quit)))
+                  (jacob-xfk-local-key "q" #'+magit/quit)))
 
 (jacob-defhookf verb-response-body-mode-hook
-  (jacob-xfk-local-key "q" #'quit-window))
+                (jacob-xfk-local-key "q" #'quit-window))
 
 (after! compile
   (jacob-defhookf compilation-mode-hook
-    (jacob-xfk-local-key "g" #'recompile)))
+                  (jacob-xfk-local-key "g" #'recompile)))
 
 (jacob-defhookf +doom-dashboard-mode-hook
-  (jacob-xfk-local-key "k" #'+doom-dashboard/forward-button)
-  (jacob-xfk-local-key "i" #'+doom-dashboard/backward-button))
+                (jacob-xfk-local-key "k" #'+doom-dashboard/forward-button)
+                (jacob-xfk-local-key "i" #'+doom-dashboard/backward-button))
 
 (jacob-defhookf org-agenda-mode-hook
-  (jacob-xfk-local-key "q" #'quit-window)
-  (jacob-xfk-local-key "g" #'org-agenda-redo-all))
+                (jacob-xfk-local-key "q" #'quit-window)
+                (jacob-xfk-local-key "g" #'org-agenda-redo-all))
+
+(after! prodigy
+  (jacob-defhookf prodigy-mode-hook
+                  (hl-line-mode 0)
+                  (jacob-xfk-local-key "d" #'prodigy-stop)
+                  (jacob-xfk-local-key "e" #'prodigy-mark)
+                  (jacob-xfk-local-key "g" #'jacob-project-search)
+                  (jacob-xfk-local-key "f" #'project-find-file)
+                  (jacob-xfk-local-key "i" #'prodigy-prev)
+                  (jacob-xfk-local-key "k" #'prodigy-next)
+                  (jacob-xfk-local-key "q" #'quit-window)
+                  (jacob-xfk-local-key "r" #'prodigy-unmark)
+                  (jacob-xfk-local-key "s" #'prodigy-restart)
+                  (jacob-xfk-local-key "v" #'prodigy-display-process))
+
+  (jacob-defhookf prodigy-view-mode-hook
+                  (compilation-minor-mode 1)
+                  (jacob-xfk-local-key "q" #'quit-window)
+                  (jacob-xfk-local-key "g" #'prodigy-restart)))
