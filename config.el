@@ -301,10 +301,10 @@ CONNECTION is the connection settings."
         (sql-connect connection)))))
 
 (jacob-defhookf sql-interactive-mode-hook
-                (when (eq sql-product 'postgres)
-                  (setq sql-prompt-regexp "^[-[:alnum:]_]*[-=]\\*?[#>] ")
-                  (setq sql-prompt-cont-regexp "^\\(?:\\sw\\|\\s_\\)*[-(]\\*?[#>] "))
-                (jacob-xfk-local-key "SPC , d" #'sql-send-paragraph))
+  (when (eq sql-product 'postgres)
+    (setq sql-prompt-regexp "^[-[:alnum:]_]*[-=]\\*?[#>] ")
+    (setq sql-prompt-cont-regexp "^\\(?:\\sw\\|\\s_\\)*[-(]\\*?[#>] "))
+  (jacob-xfk-local-key "SPC , d" #'sql-send-paragraph))
 
 (defun jacob-sqli-end-of-buffer ()
   "Move point to end of sqli buffer before sending paragraph.
@@ -355,58 +355,68 @@ Intended as before advice for `sql-send-paragraph'."
 
 (after! dired
   (jacob-defhookf dired-mode-hook
-                  (dired-hide-details-mode 1)
-                  (jacob-xfk-local-key "s" #'dired-find-file)
-                  (jacob-xfk-local-key "d" #'dired-do-delete) ; we skip the "flag, delete" process as files are sent to system bin on deletion
-                  (jacob-xfk-local-key "q" #'dirvish-quit)
-                  (jacob-xfk-local-key "i" #'dired-previous-line)
-                  (jacob-xfk-local-key "k" #'dired-next-line)
-                  (jacob-xfk-local-key "e" #'dired-mark)
-                  (jacob-xfk-local-key "r" #'dired-unmark)
-                  (jacob-xfk-local-key "g" #'revert-buffer)
-                  (jacob-xfk-local-key "x" #'dired-do-rename)
-                  (jacob-xfk-local-key "c" #'dired-do-copy)
-                  (jacob-xfk-local-key "u" #'dired-up-directory)
-                  (jacob-xfk-local-key "j" #'dired-goto-file)))
+    (dired-hide-details-mode 1)
+    (jacob-xfk-local-key "s" #'dired-find-file)
+    (jacob-xfk-local-key "d" #'dired-do-delete) ; we skip the "flag, delete" process as files are sent to system bin on deletion
+    (jacob-xfk-local-key "q" #'dirvish-quit)
+    (jacob-xfk-local-key "i" #'dired-previous-line)
+    (jacob-xfk-local-key "k" #'dired-next-line)
+    (jacob-xfk-local-key "e" #'dired-mark)
+    (jacob-xfk-local-key "r" #'dired-unmark)
+    (jacob-xfk-local-key "g" #'revert-buffer)
+    (jacob-xfk-local-key "x" #'dired-do-rename)
+    (jacob-xfk-local-key "c" #'dired-do-copy)
+    (jacob-xfk-local-key "u" #'dired-up-directory)
+    (jacob-xfk-local-key "j" #'dired-goto-file)))
 
 (after! helpful
   (jacob-defhookf helpful-mode-hook
-                  (jacob-xfk-local-key "q" #'+popup/quit-window)))
+    (jacob-xfk-local-key "q" #'+popup/quit-window)))
 
 (after! magit
   (jacob-defhookf magit-mode-hook
-                  (jacob-xfk-local-key "q" #'+magit/quit)))
+    (jacob-xfk-local-key "q" #'+magit/quit)))
 
 (jacob-defhookf verb-response-body-mode-hook
-                (jacob-xfk-local-key "q" #'quit-window))
+  (jacob-xfk-local-key "q" #'quit-window))
 
 (after! compile
   (jacob-defhookf compilation-mode-hook
-                  (jacob-xfk-local-key "g" #'recompile)))
+    (jacob-xfk-local-key "g" #'recompile)))
 
 (jacob-defhookf +doom-dashboard-mode-hook
-                (jacob-xfk-local-key "k" #'+doom-dashboard/forward-button)
-                (jacob-xfk-local-key "i" #'+doom-dashboard/backward-button))
+  (jacob-xfk-local-key "k" #'+doom-dashboard/forward-button)
+  (jacob-xfk-local-key "i" #'+doom-dashboard/backward-button))
 
 (jacob-defhookf org-agenda-mode-hook
-                (jacob-xfk-local-key "q" #'quit-window)
-                (jacob-xfk-local-key "g" #'org-agenda-redo-all))
+  (jacob-xfk-local-key "q" #'quit-window)
+  (jacob-xfk-local-key "g" #'org-agenda-redo-all))
 
 (after! prodigy
   (jacob-defhookf prodigy-mode-hook
-                  (hl-line-mode 0)
-                  (jacob-xfk-local-key "d" #'prodigy-stop)
-                  (jacob-xfk-local-key "e" #'prodigy-mark)
-                  (jacob-xfk-local-key "g" #'jacob-project-search)
-                  (jacob-xfk-local-key "f" #'project-find-file)
-                  (jacob-xfk-local-key "i" #'prodigy-prev)
-                  (jacob-xfk-local-key "k" #'prodigy-next)
-                  (jacob-xfk-local-key "q" #'quit-window)
-                  (jacob-xfk-local-key "r" #'prodigy-unmark)
-                  (jacob-xfk-local-key "s" #'prodigy-restart)
-                  (jacob-xfk-local-key "v" #'prodigy-display-process))
+    (hl-line-mode 0)
+    (jacob-xfk-local-key "d" #'prodigy-stop)
+    (jacob-xfk-local-key "e" #'prodigy-mark)
+    (jacob-xfk-local-key "g" #'jacob-project-search)
+    (jacob-xfk-local-key "f" #'project-find-file)
+    (jacob-xfk-local-key "i" #'prodigy-prev)
+    (jacob-xfk-local-key "k" #'prodigy-next)
+    (jacob-xfk-local-key "q" #'quit-window)
+    (jacob-xfk-local-key "r" #'prodigy-unmark)
+    (jacob-xfk-local-key "s" #'prodigy-restart)
+    (jacob-xfk-local-key "v" #'prodigy-display-process))
 
   (jacob-defhookf prodigy-view-mode-hook
-                  (compilation-minor-mode 1)
-                  (jacob-xfk-local-key "q" #'quit-window)
-                  (jacob-xfk-local-key "g" #'prodigy-restart)))
+    (compilation-minor-mode 1)
+    (jacob-xfk-local-key "q" #'quit-window)
+    (jacob-xfk-local-key "g" #'prodigy-restart)))
+
+(after! sly
+  (jacob-defhookf sly-mode-hook
+    (jacob-xfk-local-key "SPC , m" #'sly-eval-last-expression)
+    (jacob-xfk-local-key "SPC , d" #'sly-compile-defun)
+    (jacob-xfk-local-key "SPC , e" #'sly-eval-buffer)
+    (jacob-xfk-local-key "SPC w k" #'sly-edit-definition))
+
+  (jacob-defhookf sly-db-hook
+    (jacob-xfk-local-key "q" #'sly-db-quit)))
